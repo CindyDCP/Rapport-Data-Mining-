@@ -1,0 +1,1410 @@
+---
+title: "<span style="color:darkblue"> Rapport Data Mining UNICEF Argentine</span>"
+author: "Cindy Da Cruz Porfirio"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+    theme: united
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,warning=FALSE,message=FALSE)
+```
+
+
+```{r}
+library(psych)
+library(rstatix)
+library(kableExtra)
+library("FactoMineR")
+library("factoextra")
+library(corrplot)
+library(FactoMineR)
+library(factoextra)
+library(dplyr)
+library(tidyverse)
+library(dendextend)
+library(car)
+```
+
+
+##  <span style="color:darkblue">  I- Introduction </span>
+
+```{r }
+argentina2 <- read.csv("C:/Users/cindy/Desktop/MASTER S2/argentina.csv",row.names=1,check.names = FALSE)
+```
+
+L'Argentine deuxième pays de l'Amérique du Sud en superficie  après le Brésil, possède de nombreuses ressources agricoles, énergétiques et une capital Buenos Aires avec près de 40 millions d'habitants. Connaissant une longue histoire d'instabilité économique et politique, le pays se retrouve aujourd'hui en haut du classement des pays latino-américaines les plus en difficulté après le Venezuela et le Pérou. Après la grande crise du début des années 2000, environ 27 % des Argentins vivent dans la pauvreté et 5 % dans l'extrême pauvreté. (OCDE,2019). L'argentine oppose d'une part la capitale Buenos Aires et l'ensemble des provinces. La plupart des sites industriels et sièges sociaux des entreprises se retrouvent dans la capitale. Par ailleurs, les ressources sont inégalement réparties. Par exemple, la région du Pampa concentre la majorité de la production agricole en raison du climat tempéré. Si l'on observe la distribution ne serait-ce que de la population, deux tiers des habitants du pays se retrouve dans cette dernière.
+
+L'économie argentine étant fortement basée sur l'agriculture, n'a  pas eu la capacité de diversifier ses exportations à court terme à la suite de l'épidémie du covid-19. "63,8 % des exportations de l'Argentine sont concentrées sur les matières premières agricoles et les produits manufacturés d'origine agricole, 
+laissant le pays vulnérable à une baisse de leurs prix, notamment le maïs et le soja" (PNUD,2020). Les provinces sont inégalement touchées par la pauvreté : "on découvre à la fois des économies et des sociétés régionales fort différentes, et en même temps des traits communs , notamment l'importance des structures institutionnelles des provinces et la complexité des rapports avec la capitale". (Vélut,2002). 
+Ce fort contraste exprime l'idée qu'en fonction des villes, les possibilités d'emplois, de conditions de vie et de logement , de revenus ou d'accès à l'éducation et aux soins sont très différents. 
+
+Suite aux interventions d'urgence déterminées par l'Etat argentin en 2020, l'UNICEF nous missionne afin de répondre à deux types de programmes de cash transfers. Ces deux interventions sont à destination de populations spécifiques dans différentes provinces hors de la capitale du pays pour faire face à la crise sociale en cours. 
+
+Rappelons les différents objectifs des programmes:
+
+- Le programme **"Women empowerment"** est destiné à sortir de la pauvreté une population particulièrement vulnérable, le but étant de désigner les deux provinces les plus vulnérables. 
+
+- Le programme **"No-Poor"** est destiné à soutenir le revenu des familles vulnérables afin qu'elles ne tombent pas en-dessous du seuil de pauvreté dans les deux provinces les plus riches et les mieux dotées en matière de développement. 
+
+En s'appuyant sur les données socio-économiques par province en 2020 et différentes méthodes (Analyse en composantes principales, K-means et Partitionnement Hierarchical Clustering), nous déterminerons les régions correspondant le plus aux deux profils recherchés.  
+
+
+```{r}
+# création de ma variable PIB/hbts
+argentina2$gdp_pop<- argentina2$gdp/ argentina2$pop 
+
+argentina<- argentina2[-c(1),c(-1,-5,-6,-8:-10)] 
+# supprime les variables 
+```
+
+
+
+
+
+
+![](Argentina.jpg)
+
+##  <span style="color:darkblue"> II- Description des données: exploration et études des relations </span>
+
+
+
+```{r exploration, echo=FALSE}
+stat<-get_summary_stats(argentina, show = c("mean","min", "max","sd"))
+kable(stat, digits = 2) %>% kable_classic_2() %>% kable_styling(font_size = 15,)
+```
+
+Après avoir exploré les différentes variables de la base de donnée et effectuer des études de relation, nous avons décidé de retenir les variables suivantes: PIB/ habitants mesurant la richesse d'un pays (l'ensemble des valeurs ajoutées produites sur un an par habitant) [^1], la pauvreté, la déficience d'infrastructures et l'analphabétisme et la mortalité.
+
+La moyenne du PIB par habitant (Produit intérieur brut) est égale à 18 milliers de dollars et son écart-type est de 10 avec un minimum de 7 milliers de dollars et un maximum de 42 milliers de dollars. Cela montre la forte disparite entre les provinces. 
+
+La moyenne de la variable mortalité (mortalité à la naissance, taux pour 1000 naissances) est égale à 
+5%. 
+
+ La moyenne de la variable deficient_infra (manque d'infrastructures) est égale à 13 % avec un minimum de 4% et un maximum de 31%. 
+ 
+La moyenne de l'analphabétisme (taux de population sans instruction) est égale à 3 % avec un minimum de 1% et un maximum de 2%.
+ 
+ 
+La moyenne de la variable pauvreté (pourcentage de la population en dessous du seuil de pauvreté) est égale à 
+10 % et son écart-type est de 4% avec un minimum de 3% et un maximum de 17 %.
+
+Ces indicateurs montrent la grande divergence entre les provinces et nous montre la grande vulnérabilité de l'Argentine. 
+
+
+Plusieurs raisons expliquent les choix de nos variables:  nous avons décidé de supprimer les variables sur le nombre de salles de cinéma et de docteur (par habitant) puisque les valeurs de celles-ci sont extrêmement faibles. Au regard des profils visés, nous avons décidé de choisir une variable traduisant la richesse du pays c'est-à-dire le PIB par habitant et le taux de pauvreté. De plus, si toutes les variables sont des indicateurs de pauvreté, de nombreuses se ressemblent. Il est alors nécessaire d'en supprimer pour éviter les "bruits statistiques". Afin de traduire le développement économique d'une province, nous pouvons se baser sur les facteurs de l'indice de développement humain (IDH). Contrairement au PIB qui est  un indicateur quantitatif, le développement est à la fois une mesure quantitative et qualitative. Créé en 1990, l'indice de développement huamin permet d'évaluer le niveau de développement des pays en ne se fondant pas sur des facteurs essentiellement économiques, mais sur les structures sociales, culturelles et démographiques accompagnant la croissance. Un pays peut avoir un PIB élevé mais un indicateur de développement faible.
+Nous avons pu traduire quelques facteurs à l'aide de nos variables: l'analphabétisme traduit le niveau d'instruction, la déficience d'infrastructures mesure le dévelopement des services que ce soit pour la santé, la culture, l'éducation. La mortalité à la naissance (taux pour 1000 naissances vivantes) rejoint l'espérance de vie. 
+
+Concernant les provinces, nous avons supprimer Buenos Aires car ces interventions se font en dehors de la capital. En effet, nous avons vu ci-dessus que cette ville était atypique et s'oppose aux autres provinces. 
+
+[^1]: Sachant que la population est différente en fonction des pays, le PIB par habitant fournit une meilleure détermination du niveau de vie par rapport  au PIB. Il est une mesure plus fiable pour déterminer l’état économique d’une nation dans une perspective individuelle.
+La forte corrélation entre la variable PIB et population confirme notre choix. 
+
+
+
+Afin d'appuyer nos propos, nous avons étudier les relations entre les différentes variables. Par exemple, nous voyons que le coefficient de corrélation entre le PIB par habitants et la pauvreté est fort et négatif (-0,58). Afin de continuer notre rapport de data mining, il est nécessaire que les variables soient liées. Pour vérifier cela, il existe un test de liason appelé le test de Bartlett. 
+
+[^2]: Pour plus d'informations, vous retrouverez en annexe les matrices. 
+
+
+```{r ,echo=FALSE}
+
+mat_r <- cor(argentina)
+#mat_r
+
+library(corrplot)
+#corrplot(mat_r, method = "square", type ="lower")
+corrplot(mat_r, method = "number", type ="lower")
+```
+
+##  <span style="color:darkblue"> III- Analyse en Composantes Principales </span> 
+
+
+### a) Le test de liaison 
+
+Au regard de la p-valeur obtenue au test de Bartlett , cela nous amène à utiliser une analyse multivariée. [^2] 
+
+[^2]: p-value= 0.009925459
+
+Nous avons au prélable vérifier le respect des différentes hypothèses avant de continuer l'Analyse en composantes principales.
+
+
+### b) Standardisation des variables 
+
+```{r Standardiser, echo=FALSE}
+argentinaS<- scale(argentina)
+```
+
+Lors d'une ACP, nous pouvons centrer-réduit les variables afin de comparer les variables ayant des unités différentes. Cette étape permet de donner le même poids à chaque variable. 
+
+
+```{r, echo=FALSE}
+res.pca <- PCA(argentinaS, graph = FALSE)
+```
+
+
+### c) Le choix du nombre d'axes 
+<br>
+
+```{r, echo=FALSE}
+eig.val <- get_eigenvalue(res.pca)
+
+fviz_eig(res.pca, addlabels = TRUE, ylim = c(0, 80))
+
+
+```
+<br><br> 
+
+
+On appelle axe, une fonction linéaire de la contribution des différentes variables.
+
+Le graphique présente les valeurs propres c'est-à-dire le pourcentage de l’inertie totale expliquée par les différents facteurs. Nous devons sélectionner les axes de rallongement principaux expliquant la plus grande partie de la variance (inertie). 
+
+En prenant le critère de Cattell-Anderson: "le coude d'effondrement", nous cherchons une décroissance ou une cassue apparente sur le graphique. Dans notre analyse, les deux premières composantes principales expliquent 75% de la variation. C’est un pourcentage acceptable. Il y a une linéarité par le pourcentage du captage de l'information. A partir de la dimension 2, il y a une rupture de pente, la suite devient moins importante et marginale. 
+
+L'axe 1 représentent les liaisons les plus évidentes, structurellement qui peuvent être extraites ou analysées. Elle représente 60% de l'inertie totale. On sélectionne en fonction de la quantité (le % de l’inertie qu’il capture) et la qualité (par l’ordre de construction). 
+
+Nous pouvons projeter deux espaces distincts: les individus dans un espace variable et les variables dans un espace d’individus. L'intérêt de l'ACP est qu'elle propose un espace commun avec les individus et les variables. 
+
+```{r }
+var <- get_pca_var(res.pca)
+
+```
+
+```{r,eval=FALSE}
+head(var$coord)
+head(var$cos2)
+head(var$contrib)
+```
+
+
+
+
+Les composants de get_pca_var() présentent les coordonnées des variables permettant de créer un nuage de point. Ils donnent aussi le cosinus carré des variables (autrement dit la qualité de représentation des variables sur le graphique de l'ACP) et les contributions des variables aux composantes principales.
+Par exemple, les coordonnées de la variable pauvreté sont les suivante: 0.81 sur le dimension 1, -0.31 sur la dimension 2.
+Par ailleurs elle contribue à 28% à la dimension 1 tandis que le décrochage scolaire contribue à 22%. 
+
+
+### d) Cercle de corrélation
+
+
+```{r}
+
+fviz_pca_var(res.pca, col.var = "purple")
+```
+
+Le graphique ci-dessus est appelé graphique de corrélation des variables. Il montre les relations entre toutes les variables. Les variables telles que le manque d'infrastructures et la pauvreté sont positivement corrélés. Cependant, les variables comme le PIB par habitant est  négativement corrélé avec la pauvreté ou la mortalité à la naissance. Nous avons donc une opposition claire entre les indicateurs de pauvreté (mortalité, décrochae scolaire, manque d'infrastructures et pauvreté) et l'indicateur mesurant la richesse économique d'une province par habitant  (PIB par habitant). 
+
+
+### d) Qualité de représentation
+
+Nous nous intéressons aux observations bien représentées, celles ayant un cos2 plus élevé. Nous pouvons les visualiser. 
+
+```{r, echo=FALSE,eval=FALSE}
+head(var$cos2, 8)
+```
+
+```{r}
+library("corrplot")
+corrplot(var$cos2, is.corr=FALSE)
+```
+<br><br>
+
+Ce graphique exprime le cos2 des variables sur toutes les dimensions. Par exemple, la pauvreté, le manque d'infrastructures et le PIB par habitant sont beaucoup mieux représentés sur la dimension 1 que dans la dimension 2. 
+
+
+
+```{r, echo=FALSE}
+par(mfrow = c(2,2))
+
+fviz_cos2(res.pca, choice = "var", axes = 1:2)
+fviz_pca_var(res.pca, col.var = "cos2",
+gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE 
+             )
+```
+Les 5 variables sont toutes supérieurs à 0.60 ce qui signifie qu'elles sont plutôt bien représentées sur les deux dimensions. 
+
+Le graphique présentant le cercle de corrélation permet de visualiser la bonne représentation des variables. Comme nous l'avions observé plus haut, les variables sont plutôt proches du cercle de corrélation ce qui est positif. 
+ 
+### e) Contribution des variables aux axes principaux 
+
+Certaines observations sont importantes pour définir un axe, elle se note en contribution. 
+Si on a un axe avec deux observations qui contribuent, tout le reste est marginale. Moins il y a d’observations qui contribuent fortement à l’axe, plus l’axe est instable (c’est pourquoi on préfère des échantillons grands). L’axe capte une part de la variance , chaque observation contribue à la part de l’inertie. Ici la dimension 2 est représentée seulement par la mortalité. 
+
+
+```{r, echo=FALSE}
+# corrplot(var$contrib, is.corr=FALSE)    
+```
+
+
+```{r, echo=FALSE}
+# Contributions des variables à PC1
+fviz_contrib(res.pca, choice = "var", axes = 1, top = 10)
+# Contributions des variables à PC2
+fviz_contrib(res.pca, choice = "var", axes = 2, top = 10)
+```
+Ces graphiques montrent quelles sont les varibales les plus contributives pour chaque dimension. Dans la dimension 1, on retrouve la pauvreté, le PIB par habitant et le taux d'analphabète. Le taux de moralité contribue le plus à la dimension 2.  
+
+<br> 
+
+
+```{r,eval}
+# fviz_pca_var(res.pca, col.var = "contrib",gradient.cols = c("#00AFBB", "#E7B800","#FC4E07"))
+```
+<br><br>
+
+
+Nous avons identifier les variables les plus significativement associés avec une composante principale. 
+
+```{r, echo=FALSE}
+res.desc <- dimdesc(res.pca, axes = c(1:2), proba = 0.05)
+# Description de la dimension 1
+# res.desc$Dim.1
+```
+Les variables sont toutes significativement corrélés à la dimension 1. On remarque que le PIB par habitant est négativement corrélé. 
+
+```{r}
+# Description de la dimension 2
+#res.desc$Dim.2
+```
+La variable sur la mortalité est significativement corrélée à la dimension 2. 
+
+### f) Graphique par individu
+
+On peut effectuer la même chose que précédemment mais en prenant comme dimension non pas les individus mais ici les variables. On retrouve la répartition des individus dans l'espace variable en fonction de leurs valeurs cos2 (leur représentativité):
+
+```{r ech=FALSE,eval=FALSE}
+ind <- get_pca_ind(res.pca)
+# ind
+```
+
+```{r,echo=FALSE}
+# fviz_pca_ind (res.pca)
+```
+ 
+
+<br>
+
+
+
+```{r}
+fviz_pca_ind(res.pca, col.ind = "cos2", pointsize = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE 
+             )
+```
+
+
+<br> 
+Les variables se rapprochant de la couleur orange sont mieux représentées. Par exemple, la province Chubut est mieux représenté que Jujuy. 
+
+Par ailleurs, les provinces  regroupées comme Santa Fe et San Luis sont plus similaires que Chaco et Santa Cruz. 
+
+<br> 
+
+On peut créer un bar plot de la qualité de représentation des individus pour les deux dimensions:
+
+```{r}
+fviz_cos2(res.pca, choice = "ind",axes = 1:2)
+```
+
+Ainsi que leur contribution aux deux dimensions:
+```{r, echo=FALSE}
+# Contribution totale sur PC1 et PC2
+fviz_contrib(res.pca, choice = "ind", axes = 1:2)
+```
+On remarque que seulement Chaco, Formosa, Santa Cruz,Santiago del Estero, Chubut, Missiones contribuent aux deux dimensions. 
+
+### g) Biplot 
+
+Le graphique ci-dessous présente à la fois la répartition des variables et des provinces sur un espace commun. Nous pouvons alors observé que Chaco que Neuquen. Par ailleurs, nous retrouvons deux provinces plus éloignés : Chaco et Formosa. Celles-ci sont plus pauvres que les autres. On observe un regroupement de provinces ayant un taux de mortalité faible. La Rioja et Formosa sont touchés par une forte mortalité. Par ailleurs sur l'axe 1, on observe que Santa Cruz et la Pampa ont un fort PIB par habitant.
+
+```{r}
+fviz_pca_biplot(res.pca, repel = TRUE,
+                col.var = "#2E9FDF", # Couleur des variables
+                col.ind = "#696969"  # Couleur des individues
+                )
+
+```
+<br>
+
+##  <span style="color:darkblue"> IV- K-means </span>
+
+### a) Objectifs
+
+L'objectif est de faire des groupes de provinces de manière multidimensionnelle en prenant en compte toutes les variables de façon cohérente et homogène. Pour cela, il est nécessaire de s'appuer sur quel critère de différenciation ( de distance)? Qu’est ce qu’on mesure comme différence? Nous nous reposerons ici sur la distance euclidienne. Si les variables sont mesurées sur la même échelle, alors cette distance est la meilleure méthode.  Par ailleurs, nous utiliserons comme type de partitionnement le "Hard clustering". Autrement, dit, nous considérons que les données doivent appartenir à des sous-ensembles clairement délimités. Il ne doit pas y avoir des données qui évoluent entre deux ou plusieurs classes. Cet outil sert à faire une typologie/ un classement. [^3]
+
+[^3]: Dans un premier temps, il est primoridale de retirer les missings values.
+
+```{r}
+argentina.omit<- na.omit(argentina)
+```
+
+Notre objectif est de minimiser la distance pour maximiser la similarité entre les provinces et ainsi les regrouper. Autrement dit, on cherche à maximiser la variance inter-groupe (entre les groupes) et minimiser la variance intra-groupe (au sein du groupe).
+
+```{r, echo=FALSE}
+distanceE <- get_dist(argentinaS)
+
+
+# Changer les couleurs du dégradé
+
+# fviz_dist(distanceE,
+#gradient = list(low = "yellow",
+#mid = "orange", high = "red"))
+```
+On regarde cette matrice de distance représentant une synthèse des observations prises 2 à 2   (en fonction de la distance euclidienne). On observe que Chaco et Formosa sont les deux provinces les plus éloignés des autres. 
+
+
+
+```{r,}
+km1 <- kmeans(argentinaS, centers = 2, nstart = 25)
+head(km1,2)
+```
+
+Nous avons spécifié deux groupes. 
+Pour le groupe 2, la moyenne de pauvreté est de -0,48 contre -0,48 pour le groupe 1. Dans un cas, le signe est positif et l'autre négatif, cela traduit l'existence de deux groupes différents. Les provinces sont classées : Santa Cruz fait partie du premier groupe alors que Misiones au deuxième groupe. 
+
+### b) Cluster plot
+
+Il est mieux de visualiser et de localiser les points dans un espace géométrique. 
+
+```{r, echo=FALSE}
+# fviz_cluster(km1, data = argentinaS,
+#xlab="", ylab="")+ theme_minimal()
+```
+Comme le nombre de clusters (k) doit être défini ex-ante, il est pertinent d’utiliser plusieurs partitionnements et, d’examiner les différences dans les résultats. Nous pouvons exécuter le même
+processus pour 3, 4 et 5 clusters. On lie à la fois l'analyse composante principale et les K-means. Il prends les deux axes que j'ai réalisé pour l'ACP (sachant qu'on a 5 variables). L'axe 1 regupe la pauvreté, l'analphabétisme et le PIB par habitant (indicateur de richesse économique). Tandis que l'axe 2 traduit le taux de moralité (l'espérance de vie des habitants) autrement dit la qualité de vie. 
+
+### c) Nombre de clusters
+
+```{r}
+# En variant le nombre de clusters
+km2 <- kmeans(argentinaS, centers = 3,
+nstart = 25)
+km3 <- kmeans(argentinaS, centers = 4,
+nstart = 25)
+km4 <- kmeans(argentinaS, centers = 5,
+nstart = 25)
+```
+
+
+```{r}
+# Comparaisons visuelles
+p1 <- fviz_cluster(km1, geom =
+"point", data = argentinaS) + ggtitle("k
+= 2")
+p2 <- fviz_cluster(km2, geom =
+"point", data = argentinaS) + ggtitle("k
+= 3")
+p3 <- fviz_cluster(km3, geom =
+"point", data = argentinaS) + ggtitle("k
+= 4")
+p4 <- fviz_cluster(km4, geom =
+"point", data = argentinaS) + ggtitle("k
+= 5")
+library(gridExtra)
+grid.arrange(p1, p2, p3, p4, nrow =
+2)
+```
+Entre k= 3 et k= 5, il y a moins de variation donc c'est plus homogène. Cependant à partir de k=3, il y a une superposition. Autrement dit, des observations sont classées dans deux clusters.
+
+Il y a un outil permettant de dire qu’elle est le meilleure nombre de k (groupe). Il faut savoir que moins il y a d’observations par cluster, plus nous minimisons la variance intra-groupe et maximisons la variance inter-groupe. En réalité, on s'intéresse à partir de 2 car si nous choisissons un groupe, on prends toutes les données ce qui contraire à notre objectif. Nous aurons mécaniquement plus  de variance intra-groupe. 
+
+### d) Nombre optimal de clusters: "Elbow"
+
+```{r}
+# 1/ Déterminer le nombre optimal de clusters : "Elbow"
+fviz_nbclust(argentinaS, kmeans,
+method = "wss")+
+theme_minimal()
+```
+L’emplacement d’un ”coude” (rupture dans la linéarité dans le graphique est généralement considéré comme un indicateur du nombre approprié de clusters… On choisira alors deux groupes. 
+
+### e)  Nombre optimal de clusters: la qualité du regroupement 
+
+L’approche de la silhouette moyenne mesure la qualité d’un regroupement c'est-à-dire à quel point le groupe est consistent et homogène. Plus la silhouette est élevée, plus le regroupement est bon (on doit le maximiser). 
+
+```{r}
+# 2/ Déterminer le nombre optimal de clusters :
+"Silouhette"
+fviz_nbclust(argentinaS, kmeans,
+method = "silhouette")+
+theme_minimal()
+```
+Le nombre optimal de clusters k maximisant la silhouette moyenne sur une plage de valeurs possibles pour k est 2. 
+
+### f)  Nombre optimal de clusters: écart statistique
+
+On compare la variation totale intra cluster pour différentes valeurs de k .On la compare avec la valeur à laquelle on pourrait s’attendre: la valeur espérée s’il n’y avait pas de variation. On simule ces comparaisons pour le nombre de clusters déterminé (1 à 10). 
+
+
+```{r}
+# 3/ Déterminer le nombre optimal de clusters : "Gap Stat"
+library(cluster)
+gap_stat <- clusGap(argentinaS, FUN = kmeans,nstart = 25, K.max = 15, B = 50)
+```
+
+
+```{r}
+
+
+print(gap_stat, method =
+"firstmax")
+fviz_gap_stat(gap_stat)+
+theme_minimal()
+```
+L'outil nous propose deux groupes. 
+Les trois indicateurs nous proposent K=2. Pour ces raisons, nous choisirons deux groupes. 
+
+### g) Les provinces sélectionnées 
+
+```{r}
+final <- kmeans(argentinaS, 2, nstart
+= 25)
+print(final)
+fviz_cluster(final, data =
+argentinaS,
+xlab = "", ylab = "")+
+theme_minimal()
+```
+
+
+```{r}
+MClust <- argentina %>% mutate(Cluster = final$cluster)%>%
+
+group_by(Cluster) %>%
+summarise_all("mean")
+kable(MClust, digits = 2) %>%
+kable_minimal()
+```
+Ce tableau montre la valeur moyenne des différentes variables pour chaque cluster. Nous nous aperçevons Chaco et Formosa appartiennent au cluster 1 où les indicateurs de pauvreté sont les plus forts à savoir: le taux de pauvreté (14%) ,d'analphabète (5%) et de mortalité (7%). De même que, le PIB par habitant est plus faible (8 milliers). 
+
+Tandis que le cluster 2 présente les provinces les plus riches en terme de PIB/ habitant (22 milliers) et de développement : le taux d'analphabète est de 2%, le taux de pauvreté de 8%, le taux de défience d'infrastrcutures de 10% et le taux de mortalité de 4%. 
+
+Ces deux groupes montrent clairement la différence en terme de croissance et développement économique des provinces. 
+
+```{r}
+final_data <- cbind(argentina, cluster = km1$cluster)
+```
+
+```{r}
+final_data %>%
+arrange(cluster)
+
+```
+
+```{r}
+cluster1<-final_data[final_data$cluster==1,]
+
+```
+
+```{r}
+cluster2<-final_data[final_data$cluster==2,]
+
+```
+
+- **Le programme "Women empowerment"**
+
+
+```{r}
+c1<-cluster1 %>%
+arrange(desc(gdp_pop))
+head(c1,4)
+```
+
+Si on sépare les provinces en deux clusters et que nous regardons les valeurs pour chaque variable. L'objectif est de déterminer les provinces les plus vulnérables.En terme de PIB par habitant sont: Formosa (7 milliers) et Corrientes (8 milliers). 
+
+
+- **Le programme "No Poor"**
+
+```{r}
+c2<-cluster2 %>%
+arrange(birth_mortal)
+head(c2,4)
+```
+
+Nous devons sélectionner les provinces les plus riches et les plus dotées en matière de développement. Si nous prenons la variable sur la mortalité (la plus contributive à l'axe 2), nous retrouvons  avec un taux le plus faible : Rio Negro avec 1% et Catamarca avec 1,5%. En terme de PIB par habitant, on retrouve La Pampa et la Cordoba. 
+Nous constatons ainsi qu'une province ayant un niveau de développement élevé (mesuré par le taux de mortalité) n'est pas forcément celle ayant le plus haut niveau de richesse (PIB par habitant). 
+
+
+
+## <span style="color:darkblue">  V- Partionnement et Hierachical Clustering </span>
+
+Les deux méthodes (K-means et CAH) sont différentes mais utilisent les mêmes analyses. On produit plusieurs résultats sur la même question. L'objectif est de mesurer la robustesse et la stabilité des résultats.  On cherche aussi à regrouper les données au sein de sous-ensembles cohérents et homogènes. A partir des différences entre ces données (mesurer par la distance euclidienne), nous proposerons une regroupement de données en plusieurs classes distinctes et cohérentes. Nous ne voulons pas de cas particuliers mais comment savoir comment sont liés les provinces globalement. Ici nous établisserons des relations entre les données sous la forme d'un arbre appelé dendogramme. C'est une approche alternative ou complémentaire du K-means. Un problème épistémologique est important à relever puisque nous définissons ex-ante le nombre de clusters avant même d'avoir tester quelque chose. L'interprétation de l'analyste est primordiale dans le choix du nombre optimal de groupes. La classification ici vise à faire une hiérarchie. Toute observation est classée même si celle-ci est loin des autres . Nous trouverons des intersections entre différents groupes au fur et à mesure qu’on monte dans la hiérarchie.
+<br>
+
+
+Nous utiliserons le fonctionnement ascendant appelé aussi Agglomerative Nesting. Chaque objet est initialement considéré comme un cluster à un seul élément. 
+Les deux clusters les plus similaires sont assemblés en un nouveau cluster plus grand (nœuds). 
+Cette procédure est répétée jusqu’`a ce que tous les points soient membres d’un seul grand cluster (racine). 
+La raison pour laquelle nous nous reposons sur le fonctionnement ascendant est que la majorité des études le font et que celui-ci est plus consistent en terme de rassemblement. Nous ne voulons pas diviser mais regrouper les clusters uniques. Chaque point est considéré comme un cluster indépendant. 
+A partir de la mesure de distance, à chacune des  étapes, on fusionne les deux groupes les plus semblables (les plus proches). La procédure se poursuit jusqu’à terminer l’analyse avec le moins de groupes possibles (généralement un seul groupe contenant toutes les données). On analyse l’arbre de classification (ou dendrogramme) ainsi obtenu et on choisit le nombre de classes K à conserver. 
+
+
+On cherche à minimiser la perte d'informations et maximiser la variance intra-groupe. On reprend le même fonctionnement que K-means mais avec une stratégie agglomératif c'est-à-dire que nous rajoutons des clusters les uns avec les autres. 
+
+```{r,echo=FALSE}
+# Matrice des dissimilarité entre observations (distances euclidiennes)
+
+# distanceE
+
+# CAH avec un Complete Linkage
+
+#hc1 <- hclust(distanceE, method ="complete" )
+
+```
+
+### a) La méthode de "linkage"
+
+Agnes donne un coefficient
+d’agglomération (0,78), qui mesure
+la quantité de structure de
+regroupement trouvée (des
+valeurs plus proches de 1
+suggèrent une forte
+structure de clustering)
+
+L'intérêt est d'identifier la
+méthode de ”linkage” qui
+produit le coefficient le plus
+élevé (identification de la
+structure de de
+regroupement la plus forte). Nous utiliserons la méthode "ward" en raison de son coefficient plus important 
+
+```{r,echo=FALSE}
+# fonction AGNES hc2 <- agnes(distanceE, method = "complete")
+
+#hc2$ac
+```
+`
+
+```{r}
+# fonction AGNES
+# hc3 <- agnes(distanceE, method ="average")
+
+# coefficient d’aggloḿeration hc3$ac
+```
+
+```{r}
+# fonction AGNES
+#hc4 <- agnes(distanceE, method ="single")
+
+# coefficient d’aggloḿeration"hc4$ac
+```
+
+```{r}
+# fonction AGNES
+hc5 <- agnes(distanceE, method =
+"ward")
+
+# coefficient d’agglomération
+#hc5$ac
+```
+
+
+### b) Visualisation du dendogramme 
+
+```{r}
+hc5 <- agnes(distanceE, method = "ward")
+
+pltree(hc5, cex = 0.6, hang = -1, main = "Dendrogramme (AGNES)")
+```
+<br> 
+
+La hauteur de la fusion, indiquée sur l’axe vertical, indique la (dis)similitude entre deux observations (les clusters) , plus le nœud est élevée, plus la dissimilitude est grand). Plus la hauteur de la fusion est  élevée, moins les observations sont similaires. Notez que les conclusions sur la proximité de deux observations ne peuvent être tirées que sur la base de la hauteur à laquelle les branches contenant ces deux observations sont fusionnées en premier. 
+Nous ne pouvons pas utiliser la proximité de deux observations le long de l’axe horizontal comme critère de leur similitude. On ne tient pas compte de la proximité au niveau de la feuille). Neuquen et Corrientes sont à côté mais ne sont pas similaires. On prend pas en compte l’écart entre les individus.  
+Sans surprise, nous retrouvons Chaco et Formosa ensemble.
+La hauteur de la coupe au dendrogramme contrôle le nombre de clusters obtenus. Il joue le même rôle que le k dans le clustering k − means. Afin d’identifier les sous-groupes (c’est-`a-dire les clusters). En fonction de l’endroit où nous couperons notre arbre nous aurons un nombre de clusters. Nous ne déterminons pas le nombre de clusters comme K-means ici, nous le lisons. 
+
+```{r}
+# HC avec la méthode de Ward (linkage + D2 = euclidienne)
+
+hc6 <- hclust(distanceE, method =
+"ward.D2" )
+
+# Couper l’arbre en 2 groupes
+sub_grp <- cutree(hc6, k = 2)
+```
+
+```{r}
+data2<- cbind(argentina, cluster = sub_grp)
+```
+
+
+
+
+
+Nous avons 11 observations dans le premier groupe contre 10 dans le deuxième groupe ce qui reste homogène. 
+
+### c) Comparaison du cluster plot avec K-means
+
+```{r}
+# Ajouter une variable "cluster" à la base de donńees intiale
+argentina %>%
+mutate(cluster = sub_grp) %>% head()
+
+
+fviz_cluster(list(data = argentinaS, cluster = sub_grp), ylab = "Mortalité, dim2 (X)",
+xlab = "Indicateur de richesse, dim 1 (X)")+
+theme_minimal()
+
+```
+Il faut faire attention puisque maintenant le groupe considérer comme plus vulnérable est considéré comme le groupe 2 alors qu'avec Kmeans il était considéré dans le groupe 1. Néanmoins, il reste toujours au même endroit. Ce graphique nous permet de comparer avec celui de K-means et observer si nous retrouvons des régularités.On observe une superposition des deux clusters ce qui est problématique: Entre Rios et et San Juan appartiennent à deux groupes.
+
+
+Nous voulons équilibrer la quantité d’hétérogénéité et la quantité d’informations. Si nous prends 1 nœud, il y aura certes beaucoup de variance inter-groupe mais on aura beaucoup d’informations. La limite repose sur le choix subjectif à propos du nombre de clusters.
+
+### d) Les provinces sélectionnées 
+
+
+```{r}
+clusterpoor2<-data2[data2$cluster==2,]
+clusterrich1<-data2[data2$cluster==1,]
+```
+
+- Le programme **"Women empowerment"**
+
+Le tableau ci-dessous nous permet de classer les provinces dans les deux clusters. 
+
+```{r}
+class2<-clusterpoor2 %>%
+arrange(gdp_pop)
+head(class2,4)
+```
+
+
+Rappelons que l'objectif est de déterminer les provinces les plus vulnérables.  En terme de PIB par habitant nous retrouvons encore: Formosa (7 milliers) et Corrientes (8 milliers). 
+
+- Le programme **"No Poor"**
+
+```{r}
+class<-clusterrich1 %>%
+arrange(birth_mortal)
+head(class,4)
+```
+Nous retrouvons  avec un taux de mortalité le plus faible : Rio Negro avec 1% et Catamarca avec 1,5%. 
+
+Ces deux résultats nous montrent que quelque soit la méthode, nos résultats sont plutôt robustes.
+
+```{r}
+
+# Deux HC avec deux m ́ethodes
+
+hcA <- hclust(distanceE, method = "complete")
+hcB <- hclust(distanceE, method = "ward.D2")
+
+# Cŕeer les deux dendrogrammes
+dend1 <- as.dendrogram(hcA)
+dend2 <- as.dendrogram(hcB)
+
+```
+
+### e) Comparaison des classifications CAH et K-means
+
+Nous pouvons savoir si dans une méthode, les individus sont classés de la même façon? 
+Si les individus sont placés au même endroit, cela signifie que notre résultat est robuste, stable. Cette mise de comparaison entre deux méthodes permet de savoir la robustesse de mon résultat. 
+
+On met deux dendrogrammes en face de l’autre et on lie les individus par des traits.  Il faut que les blocs aient dans le même sens. Les groupes sont pas placés de la même manière. 
+Pas dans le même ordre c’est pas grave par contre X qui est dans le groupe X est classé dans un autre groupe avec le lien X.  A quelques observations près, on a la même classification. 
+
+
+```{r}
+# Inclure le coefficient et modifier la visualisation
+dend_list <- dendlist(dend1, dend2)
+tanglegram(dend1, dend2,
+highlight_distinct_edges = FALSE,
+common_subtrees_color_lines = FALSE,
+common_subtrees_color_branches =TRUE,
+main = paste("entanglement =",
+round(entanglement(dend_list), 2)) )
+```
+
+
+Un coefficient
+d’enchevêtrement plus faible correspond à
+un bon alignement. Autrement dit, cela signifie que les résultats ne sont pas dépendants des méthodes utilisées. Ici 0,3 est proche de 0, ce qui traduit un bon alignement.
+
+Comme pour la méthode de K-means, nous allons déterminer à l'aide d'outils la partition optimale. 
+
+### f) Nombre optimal de clusters: le ”Coude d’effondrement”
+
+```{r}
+# 1/ D ́eterminer le nombre optimal de clusters : "Elbow"
+fviz_nbclust(argentinaS, FUN = hcut, method = "wss")+
+theme_minimal()
+```
+Il y a une rupture de linéarité dans le graphique à partir de 2. Nous pouvons alors considéré que 2 reste l'indicateur du nombre approprié de clusters selon la méthode du coude d'effondrement. 
+
+<br> 
+
+### g) Nombre optimal de clusters:”Indice ”silouhette”
+
+```{r}
+# 2/ D ́eterminer le nombre optimal de clusters : "Silouhette"
+
+fviz_nbclust(argentinaS, FUN = hcut, method = "silhouette") + theme_minimal()
+```
+Comme pour l'indice précédent, nous retrouvons aussi que le nombre optimal de clusters est 2. 
+
+### h) Nombre optimal de clusters: écart statistique
+
+```{r}
+# 3/ ́Determiner le nombre optimal de clusters : "Gap Stat."
+library(cluster)
+
+gap_stat <- clusGap(argentinaS, FUN =
+hcut,
+nstart = 25,
+K.max = 10, B = 50)
+print(gap_stat, method =
+"firstmax")
+
+```
+
+```{r}
+fviz_gap_stat(gap_stat)+
+theme_minimal()
+```
+
+
+
+Cependant, pour cette indice, 1 cluster serait nécessaire. Cependant, au regard de nos objectifs, il n'est pas utile d'en choisir 1. 
+
+AU vu des résultats des différents indices nous choisirons deux clusters. 
+
+```{r}
+# Dendrogramme horizontal
+#fviz_dend(hc6 , k = 2, cex = 0.55 , horiz = TRUE , rect #= TRUE ,
+#"rect_border = "jco", rect_fill = TRUE ,
+#main ="Dendrogramme avec f viz dend")+theme_minimal()
+
+# Dendrogramme en "r ́eseau"
+fviz_dend(hc6 , cex = 0.75 , k = 2,
+k_colors = "jco", type = "phylogenic")+  theme_minimal()
+
+# Dendrogramme circulaire
+
+#fviz_dend(hc6 , cex = 0.7 , k = 2,k_colors = "jco", type = "circular")+theme_minimal()
+```
+
+
+L'objectif de savoir si nous retrouvons les mêmes observations avec Kmeans et Hierarchical clustering? On veut déterminer les régularités. Les visualisations sont indeitiques ce qui signifie que nos résultats ne dépendent pas de l'outil utilisé et que ces derniers sont robustes. On retrouve la même perspective, c’est donc un résultat structurel.  
+
+## <span style="color:darkblue"> VI- Résultats et discussions </span>
+
+L'espace argentin présente de grands contrastes socioéconomiques et géographiques. Si des espaces concentrent des richesses (littoraux, métropoles), les périphéries sont délaissés, touchées par une grande pauvreté. Sachant que le premier **programme "Women Empowerment"** vise les provinces les plus vulnérables, il est conseillé de cibler : Formosa et Corientes. Finalement Chaco n'est pas la province la plus vulnérable malgré le regroupement de Formosa et Chaco dans le dendogramme.
+
+Concernant le deuxième **programme "No Poor"**, il serait intéressant de cibler Rio Negro et Catamarca. 
+
+Cette étude met en avant qu'une province ayant un PIB par habitant élevé n'a pas forcément un niveau de développement élevé (mesuré par des indicateurs qualitatifs tels que le manque d'infrastructures). Par exemple, Santa Cruz a le PIB par habitant le plus élevé (42 milliers de dollars) mais le taux de déficience d'infrastructures n'est pas le plus faible (7%). Tandis que Mendoza a le taux de défience le plus faible (4%), mais son PIB/ habitant n'est pas le plus élevé (19 milliers de dollars).  Il est donc primordiale de distinguer la richesse économique d'une province et son niveau de développement lorsque nous cherchons à étudier une province. 
+<br> 
+
+Notre étude est confrontée à plusieurs limites tout d'abord le choix de nos variables. La richesse d'un pays mesuré (ici mesuré par le PIB par habitant) est difficile à elle seule de classer les provinces. "Il faudrait prendre en compte le coût de vie de la vie entre provinces, les revenus non monétaires, les services publics fournis gratuitement ou non par les provinces. Par ailleurs, nous pourrions prendre en compte la qualité de vie de ce pays. D'autres indicateurs comme le bonheur intérieur brut intègre la santé ou l'équilibre entre la vie profesionnelle et la vie de famille. Ces critères sont difficilement mesurables mais permettraient une nouvelle approche de l'économie. 
+
+Par ailleurs, lorsque nous devons choisir les provinces les plus vulnérables, il est difficile de se baser sur une variable. En terme de développement, il existe une multitude de variables: taux de mortalité, déficience d'infrastructures... 
+
+
+De même, plusieurs obstacles entrent dans notre champs d'étude. Par exemple, lors de la méthode hiérarchique, nous devions faire des choix que ce soit pour: 
+- la mesure de distance = euclidienne ou Man. 
+- la mesure du lien (d’où l'intérêt de comparer les différents types de liens)
+- la façon de découper le dendrogramme
+
+
+
+Tous ces choix constituent une limite au niveau de l'interprétation et de la généralisation de nos résultats.  
+Les décisions prises peuvent donner des résultats différents en fonction de la personne qui fait le rapport. Néanmoins, les indices tels que celui de silhouette ou l'écart statique permettent d’harmoniser les résultats entre les utilisateurs. La complémentarité des méthodes permet de prouver la robustesse de nos résultats. Celle-ci reste partielle puisque que provinces appartiennent à deux clusters dans notre cas. 
+
+
+<br> 
+
+##  <span style="color:darkblue"> Sources </span>
+
+- Gravel, N. (2003). VELUT, Sébastien (2002) L’Argentine. Des provinces à la nation. Paris, PUF (Coll.«Géographies»), 296 p.(ISBN 2-13-052945-3). Cahiers de géographie du Québec, 47(130), 142-143.
+- OECD. (2019). OECD Economic Surveys: Argentina 2019. OECD.
+- PNUD.(2020). Social and Economic Impact of COVID-19 and Policy Options in Argentina. Technical Report.https://www.latinamerica.undp.org/content/rblac/en/home/library/crisis_prevention_and_recovery/social-and-economic-impact-of-covid-19-and-policy-options-in-arg.html
+- Photo Argentine  Wikipédia https://upload.wikimedia.org/wikipedia/commons/4/40/Argentina_Administrative_Divisions_CIA_World_Factbook.jpg 
+
+##  <span style="color:darkblue"> Annexes</span>
+
+
+```{r Packages, echo=TRUE}
+library(psych)
+library(rstatix)
+library(kableExtra)
+library("FactoMineR")
+library("factoextra")
+library(corrplot)
+library(FactoMineR)
+library(factoextra)
+library(dplyr)
+library(tidyverse)
+library(dendextend)
+library(car)
+```
+
+
+```{r data, echo=TRUE}
+argentina2 <- read.csv("C:/Users/cindy/Desktop/MASTER S2/argentina.csv",row.names=1,check.names = FALSE)
+```
+
+
+
+```{r, echo=TRUE}
+# création de ma variable PIB/hbts
+argentina2$gdp_pop<- argentina2$gdp/ argentina2$pop 
+
+argentina<- argentina2[-c(1),c(-1,-5,-6,-8:-10)] 
+# supprime les variables 
+```
+
+
+```{r explo, echo=TRUE}
+stat<-get_summary_stats(argentina, show = c("mean","min", "max","sd"))
+kable(stat, digits = 2) %>% kable_classic_2() %>% kable_styling(font_size = 15,)
+```
+
+
+
+```{r , echo=TRUE}
+
+mat_r <- cor(argentina)
+mat_r
+
+library(corrplot)
+corrplot(mat_r, method = "square", type ="lower")
+corrplot(mat_r, method = "number", type ="lower")
+```
+
+Les conditions de l'Analyse Composante Principale
+
+a) Condition 1: Le nombre de variables 
+
+On réalise une ACP sur un ensemble substantiel de variables (K > 2), mais extraire 5 facteurs à partir de 8 variables ne permet pas vraiment de réduire de façon intéressante le nombre de variables originales.  C'est pourquoi nous sommes passés de 11 variables à 6 variables.
+
+b) Conditions 2: Type de variables considérées
+
+Il est préférable d'avoir des variables continues  mais la technique fonctionne également avec des variables discrètes. 
+
+c) Condition 3: Nombre d’individus
+
+Il est recommandé d’avoir un  échantillon relativement grand pour assurer une puissance statistique minimale (plus de 100 obs.). Hair et al. (1998) donnent comme règle générale : avoir un ratio d’au moins 10 observations par variable [^5]
+
+Cette condition est respectée puisque nous avons 22 observations par variable.
+
+[^5]: D. Zelterman, Applied Multivariate Statistics with R, en,
+s ́er. Statistics for Biology and Health. Geneva : Springer
+International Publishing, 2015. (visit ́e le 07/01/2021).
+
+
+d) Corrélation des variables prises 2 à 2
+
+Nous voulons savoir s'il existe des liaisons interindividuelles. Une relation entre deux varibales est nécessaire pour effectuer une analyse multidimensionnelle. 
+
+
+Comment on sait qu’il y a assez de liaisons? 
+
+Le test de Barlett (sphéricité) permet de savoir si l'on peut considérer que ces corrélations prises 2 à 2 sont assez importantes pour ne pas se compenser des unes des autres. Est ce que globalement cette matrice de corrélation est différente de 0? 
+
+```{r, echo=TRUE}
+bar.test <- cortest.bartlett(mat_r,n=nrow(argentina))
+bar.test
+```
+
+e) Standardisation des variables
+
+```{r Stand, echo=TRUE}
+argentinaS<- scale(argentina)
+```
+
+
+```{r, echo=TRUE}
+res.pca <- PCA(argentinaS, graph = FALSE)
+```
+
+
+c) Le choix du nombre d'axes
+
+
+```{r, echo=TRUE}
+eig.val <- get_eigenvalue(res.pca)
+eig.val
+
+fviz_eig(res.pca, addlabels = TRUE, ylim = c(0, 50))
+
+
+```
+
+
+```{r, echo=TRUE }
+var <- get_pca_var(res.pca)
+var
+
+```
+
+```{r, echo=TRUE}
+head(var$coord)
+head(var$cos2)
+head(var$contrib)
+```
+
+d) Cercle de corrélation
+
+
+```{r, echo=TRUE}
+
+fviz_pca_var(res.pca, col.var = "purple")
+```
+
+
+d) Qualité de représentation
+
+
+```{r, echo=TRUE}
+head(var$cos2, 8)
+```
+
+```{r}
+library("corrplot")
+corrplot(var$cos2, is.corr=FALSE)
+```
+<br><br>
+
+
+
+
+```{r, echo=TRUE}
+fviz_cos2(res.pca, choice = "var", axes = 1:2)
+```
+
+
+```{r, echo=TRUE}
+fviz_pca_var(res.pca, col.var = "cos2",
+gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE 
+             )
+```
+
+
+e) Contribution des variables aux axes principaux 
+
+
+
+```{r, echo=TRUE}
+corrplot(var$contrib, is.corr=FALSE)    
+```
+
+
+```{r, echo=TRUE}
+# Contributions des variables à PC1
+fviz_contrib(res.pca, choice = "var", axes = 1, top = 10)
+# Contributions des variables à PC2
+fviz_contrib(res.pca, choice = "var", axes = 2, top = 10)
+```
+
+
+```{r, echo=TRUE}
+fviz_pca_var(res.pca, col.var = "contrib",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07")
+             )
+```
+
+
+```{r, echo=TRUE}
+res.desc <- dimdesc(res.pca, axes = c(1:2), proba = 0.05)
+# Description de la dimension 1
+res.desc$Dim.1
+```
+
+
+```{r, echo=TRUE}
+# Description de la dimension 2
+res.desc$Dim.2
+```
+
+
+```{r, echo=TRUE}
+ind <- get_pca_ind(res.pca)
+ind
+```
+
+```{r, echo=TRUE}
+fviz_pca_ind (res.pca)
+```
+
+
+
+
+```{r, echo=TRUE}
+fviz_pca_ind(res.pca, col.ind = "cos2", pointsize = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE 
+             )
+```
+
+
+
+```{r, echo=TRUE}
+fviz_cos2(res.pca, choice = "ind",axes = 1:2)
+```
+
+
+```{r, echo=TRUE}
+# Contribution totale sur PC1 et PC2
+fviz_contrib(res.pca, choice = "ind", axes = 1:2)
+```
+
+
+```{r, echo=TRUE}
+fviz_pca_biplot(res.pca, repel = TRUE,
+                col.var = "#2E9FDF", # Couleur des variables
+                col.ind = "#696969"  # Couleur des individues
+                )
+
+```
+<br>
+
+A/ K-means
+
+
+
+```{r, echo=TRUE}
+argentina.omit<- na.omit(argentina)
+```
+
+
+```{r, echo=TRUE}
+distanceE <- get_dist(argentinaS)
+
+
+# Changer les couleurs du dégradé
+
+fviz_dist(distanceE,
+gradient = list(low = "yellow",
+mid = "orange", high = "red"))
+```
+
+
+```{r, echo=TRUE}
+km1 <- kmeans(argentinaS, centers = 2, nstart = 25)
+km1
+```
+
+```{r, echo=TRUE}
+fviz_cluster(km1, data = argentinaS,
+xlab="", ylab="")+ theme_minimal()
+```
+
+
+
+```{r, echo=TRUE}
+# En variant le nombre de clusters
+km2 <- kmeans(argentinaS, centers = 3,
+nstart = 25)
+km3 <- kmeans(argentinaS, centers = 4,
+nstart = 25)
+km4 <- kmeans(argentinaS, centers = 5,
+nstart = 25)
+```
+
+
+```{r, echo=TRUE}
+# Comparaisons visuelles
+p1 <- fviz_cluster(km1, geom =
+"point", data = argentinaS) + ggtitle("k
+= 2")
+p2 <- fviz_cluster(km2, geom =
+"point", data = argentinaS) + ggtitle("k
+= 3")
+p3 <- fviz_cluster(km3, geom =
+"point", data = argentinaS) + ggtitle("k
+= 4")
+p4 <- fviz_cluster(km4, geom =
+"point", data = argentinaS) + ggtitle("k
+= 5")
+library(gridExtra)
+grid.arrange(p1, p2, p3, p4, nrow =
+2)
+```
+
+
+
+```{r, echo=TRUE}
+# 1/ Déterminer le nombre optimal de clusters : "Elbow"
+fviz_nbclust(argentinaS, kmeans,
+method = "wss")+
+theme_minimal()
+```
+
+
+a)  Qualité du regroupement 
+
+
+
+```{r, echo=TRUE}
+# 3/ Déterminer le nombre optimal de clusters : "Gap Stat"
+library(cluster)
+gap_stat <- clusGap(argentinaS, FUN =
+kmeans,
+nstart = 25,
+K.max = 15, B = 50)
+print(gap_stat, method =
+"firstmax")
+fviz_gap_stat(gap_stat)+
+theme_minimal()
+```
+ 
+
+```{r, echo=TRUE}
+final <- kmeans(argentinaS, 2, nstart
+= 25)
+print(final)
+fviz_cluster(final, data =
+argentinaS,
+xlab = "", ylab = "")+
+theme_minimal()
+```
+
+
+```{r, echo=TRUE}
+MClust <- argentina %>% mutate(Cluster = final$cluster)%>%
+
+group_by(Cluster) %>%
+summarise_all("mean")
+kable(MClust, digits = 2) %>%
+kable_minimal()
+```
+
+
+```{r}
+final_data <- cbind(argentina, cluster = km1$cluster)
+```
+
+```{r}
+final_data %>%
+arrange(cluster)
+
+```
+
+```{r}
+cluster1<-final_data[final_data$cluster==1,]
+cluster1
+```
+
+```{r}
+cluster2<-final_data[final_data$cluster==2,]
+cluster2
+```
+
+```{r}
+cluster1 %>%
+arrange(gdp_pop)
+```
+
+
+
+```{r}
+cluster2 %>%
+arrange(gdp_pop)
+```
+
+
+```{r, echo=TRUE}
+# Matrice des dissimilarité entre observations (distances euclidiennes)
+
+distanceE
+
+# CAH avec un Complete Linkage
+
+hc1 <- hclust(distanceE, method =
+"complete" )
+
+```
+
+
+
+```{r, echo=TRUE}
+# fonction AGNES
+hc2 <- agnes(distanceE, method =
+"complete")
+
+# coefficient d’aggloḿeration
+hc2$ac
+```
+`
+
+```{r, echo=TRUE}
+# fonction AGNES
+hc3 <- agnes(distanceE, method =
+"average")
+
+# coefficient d’aggloḿeration
+hc3$ac
+```
+
+```{r, echo=TRUE}
+# fonction AGNES
+hc4 <- agnes(distanceE, method =
+"single")
+
+# coefficient d’aggloḿeration
+hc4$ac
+```
+
+```{r, echo=TRUE}
+# fonction AGNES
+hc5 <- agnes(distanceE, method =
+"ward")
+
+# coefficient d’agglomération
+hc5$ac
+```
+
+
+```{r, echo=TRUE}
+hc5 <- agnes(distanceE, method = "ward")
+
+pltree(hc5, cex = 0.6, hang = -1, main = "Dendrogramme (AGNES)")
+```
+ 
+
+```{r, echo=TRUE}
+# HC avec la méthode de Ward (linkage + D2 = euclidienne)
+
+hc6 <- hclust(distanceE, method =
+"ward.D2" )
+
+# Couper l’arbre en 4 groupes
+sub_grp <- cutree(hc6, k = 2)
+
+table(sub_grp)
+```
+
+
+
+```{r, echo=TRUE}
+# Ajouter une variable "cluster" à la base de donńees intiale
+argentina %>%
+mutate(cluster = sub_grp) %>%
+head
+plot(hc6, cex = 0.6)
+rect.hclust(hc5, k = 2, border =
+2:5)
+
+
+# Visualiser sur un plan `a deux dimensions (ACP comme k-means)
+
+fviz_cluster(list(data = argentinaS, cluster = sub_grp), ylab = "PIB/HBTS, dim2 (X)",
+xlab = "Indicateur de pauvreté, dim 1 (X)")+
+theme_minimal()
+```
+ 
+
+```{r, echo=TRUE}
+
+# Deux HC avec deux m ́ethodes
+
+hcA <- hclust(distanceE, method = "complete")
+hcB <- hclust(distanceE, method = "ward.D2")
+
+# Cŕeer les deux dendrogrammes
+dend1 <- as.dendrogram(hcA)
+dend2 <- as.dendrogram(hcB)
+
+```
+
+
+ 
+
+
+```{r, echo=TRUE}
+# Inclure le coefficient et modifier la visualisation
+dend_list <- dendlist(dend1, dend2)
+tanglegram(dend1, dend2,
+highlight_distinct_edges = FALSE,
+common_subtrees_color_lines = FALSE,
+common_subtrees_color_branches =TRUE,
+main = paste("entanglement =",
+round(entanglement(dend_list), 2)) )
+```
+
+
+
+a) Le ”Coude d’effondrement”
+
+```{r, echo=TRUE}
+# 1/ D ́eterminer le nombre optimal de clusters : "Elbow"
+fviz_nbclust(argentinaS, FUN = hcut, method = "wss")+
+theme_minimal()
+```
+
+b) L'Indice ”silouhette”
+
+```{r, echo=TRUE}
+# 2/ D ́eterminer le nombre optimal de clusters : "Silouhette"
+
+fviz_nbclust(argentinaS, FUN = hcut, method = "silhouette") + theme_minimal()
+```
+
+
+c) L'écart statistique
+
+```{r, echo=TRUE}
+# 3/ ́Determiner le nombre optimal de clusters : "Gap Stat."
+library(cluster)
+gap_stat <- clusGap(argentinaS, FUN =
+hcut,
+nstart = 25,
+K.max = 10, B = 50)
+print(gap_stat, method =
+"firstmax")
+fviz_gap_stat(gap_stat)+
+theme_minimal()
+```
+
+
+```{r, echo=TRUE}
+# Dendrogramme horizontal
+fviz_dend(hc6 , k = 3, cex = 0.55 , horiz = TRUE , rect = TRUE ,
+rect_border = "jco", rect_fill = TRUE ,
+main =
+"Dendrogramme avec f viz dend")+
+theme_minimal()
+# Dendrogramme en "r ́eseau"
+fviz_dend(hc6 , cex = 0.75 , k = 2,
+k_colors = "jco", type = "phylogenic")+  theme_minimal()
+
+# Dendrogramme circulaire
+
+fviz_dend(hc6 , cex = 0.7 , k = 3,
+k_colors = "jco", type = "circular")+
+theme_minimal()
+```
+
+```{r, echo=TRUE}
+# HC avec la m ́ethode de Ward (linkage + D2 = euclidienne)
+hc5 <- hclust(distanceE, method =
+"ward.D2")
+
+# Couper l’arbre en 3 groupes
+sub_grp <- cutree(hc6, k = 3)
+
+# Visualiser sur un plan `a deux dimensions (ACP comme k-means)
+
+fviz_cluster(list(data = argentinaS,
+cluster = sub_grp), ylab =
+"Développement, dim2 (X%)",
+xlab = "Richesse, dim1 (X%)")+
+theme_minimal()
+```
+
+```{r, echo=TRUE}
+# Kmeans optimal (k=4)
+km <- kmeans(argentinaS, 2, nstart = 25)
+fviz_cluster(km, data = argentinaS, main
+= "Kmeans method")+
+theme_minimal()
+```
